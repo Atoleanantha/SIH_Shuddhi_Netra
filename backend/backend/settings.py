@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "users",
+    "post_office",
+    "waste_management",
     "rest_framework",
     "rest_framework.authtoken"
 ]
