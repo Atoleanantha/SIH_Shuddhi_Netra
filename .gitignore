@@ -1,0 +1,57 @@
+# Byte-compiled files
+*.py[cod]
+__pycache__/
+*.so
+*.pyd
+
+# Virtual environment
+venv/
+env/
+
+# Django stuff
+*.log
+*.pot
+*.pyc
+
+
+# Local development settings
+local_settings.py
+
+# Media files
+media/
+
+# Static files
+staticfiles/
+
+# Secrets and credentials
+.env
+*.env
+
+# Testing and coverage
+*.cover
+.coverage
+coverage.xml
+htmlcov/
+*.pytest_cache
+
+# MyPy and Type Checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bak
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Node modules (if using npm or yarn for frontend)
+node_modules/
