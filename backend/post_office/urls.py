@@ -1,7 +1,7 @@
 from rest_framework.routers import DefaultRouter
 from post_office.views import PostOfficeViewSet
+from django.urls import path
 
-router = DefaultRouter()
-router.register(r'postoffice', PostOfficeViewSet, basename='postoffice')
-
-urlpatterns = router.urls
+urlpatterns = [
+    path('postoffice/', PostOfficeViewSet.as_view(), name='postoffice-list-create'),
+]

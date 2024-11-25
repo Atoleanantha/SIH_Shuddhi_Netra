@@ -99,3 +99,18 @@ class SubDivisionalOfficeSignUpSerializer(serializers.ModelSerializer):
             division_pincode=validated_data['division_pincode'],
         )
         return user
+
+class DivisionalOfficeSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username")
+
+    class Meta:
+        model = DivisionalOffice
+        fields = ['username', 'full_name', 'phone_number', 'address', 'pincode']
+
+
+class SubDivisionalOfficeSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username")
+
+    class Meta:
+        model = SubDivisionalOffice
+        fields = ['username', 'full_name', 'phone_number', 'address', 'pincode', 'division_pincode']
