@@ -120,8 +120,8 @@ class PostOfficeViewSet(APIView):
             # print("cuurent", current_user_division)
             offices = self.queryset.filter(division_pincode=current_user_division)
             serializer = PostOfficeSerializer(offices, many=True)
-            if len(serializer.data):
+            if len(serializer.data)==0:
                 return Response({"message": "User is not associated with a divisional office."}, status=403)
-            return Response({"data":serializer.data,"message": "User is not associated with a divisional office."})
+            return Response({"data":serializer.data,"message": "Success"})
         except DivisionalOffice.DoesNotExist:
             return Response({"error": "User is not associated with a divisional office."}, status=403)

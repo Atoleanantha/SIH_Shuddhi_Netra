@@ -24,3 +24,5 @@ git remote add origin https://github.com/Atoleanantha/SIH_Shuddhi_Netra.git
 git branch -M main
 git push -u origin main
 
+ git branch phase2-events  //new branch
+

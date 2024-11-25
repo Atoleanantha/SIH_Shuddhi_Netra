@@ -12,17 +12,19 @@ class CleaningStaff(models.Model):
 class Event(models.Model):
     id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=255)
+    pincode = models.ForeignKey(PostOffice, on_delete=models.SET_NULL,null=True)
     description = models.TextField()
     attachment = models.FileField(upload_to='attachments/')
     date_time = models.DateTimeField()
 
 class EventReport(models.Model):
     id = models.AutoField(primary_key=True)
-    pincode = models.ForeignKey(PostOffice, on_delete=models.CASCADE)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE)
+
+    pincode = models.ForeignKey(PostOffice, on_delete=models.SET_NULL,null=True)
     report_description = models.TextField()
     name = models.CharField(max_length=255)
     atLocation = models.BooleanField(default=False)
-    event = models.ForeignKey(Event, on_delete=models.CASCADE)
     attached_report = models.FileField(upload_to='reports/')
     date_time = models.DateTimeField()
 
