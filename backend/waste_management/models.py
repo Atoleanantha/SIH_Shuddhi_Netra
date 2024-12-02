@@ -20,11 +20,11 @@ class Event(models.Model):
 class EventReport(models.Model):
     id = models.AutoField(primary_key=True)
     event = models.ForeignKey(Event, on_delete=models.CASCADE)
-
     pincode = models.ForeignKey(PostOffice, on_delete=models.SET_NULL,null=True)
+    
     report_description = models.TextField()
     name = models.CharField(max_length=255)
-    atLocation = models.BooleanField(default=False)
+    atLocation = models.CharField(max_length=255)
     attached_report = models.FileField(upload_to='reports/')
     date_time = models.DateTimeField()
 

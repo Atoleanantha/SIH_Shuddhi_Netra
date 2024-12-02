@@ -1,7 +1,7 @@
 # urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from waste_management.views import EwasteViewSet, PaperWasteViewSet, SelledPaperWasteViewSet,CleaningStaffViewSet,EventViewSet
+from waste_management.views import EwasteViewSet, PaperWasteViewSet, SelledPaperWasteViewSet,EventReportViewSet,CleaningStaffViewSet,EventViewSet
 
 # urls.py
 from django.conf import settings
@@ -15,7 +15,8 @@ router.register(r'selledpaperwaste', SelledPaperWasteViewSet, basename='selledpa
 router.register(r'cleaning-staff', CleaningStaffViewSet, basename='cleaning_staff')
 
 '''*******  Event Endpoint ***********'''
-router.register(r'event-management/event', EventViewSet, basename='events')
+router.register(r'events', EventViewSet, basename='events')
+router.register(r'event-report', EventReportViewSet, basename='event-report')
 
 
 # The router will automatically create the URL patterns

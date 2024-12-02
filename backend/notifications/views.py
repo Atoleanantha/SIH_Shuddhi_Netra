@@ -7,20 +7,93 @@ from .models import Notification
 from waste_management.models import CleaningStaff
 from .serializers import NotificationSerializer
 from rest_framework.permissions import IsAuthenticated
-from users.api.permissions import IsDivisionalOffice,IsSubDivisionalOffice
 from users.models import DivisionalOffice, SubDivisionalOffice
 from post_office.models import PostOffice
-from rest_framework.decorators import action
+from django.core.files.storage import default_storage
+from rest_framework.parsers import MultiPartParser, FormParser
+import os
+from django.conf import settings
+
+import cloudinary
+import cloudinary.uploader
+from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
+from ultralytics import YOLO
+import numpy as np
+from PIL import Image
+import cv2
+from django.conf import settings
+from datetime import datetime  # Import datetime to get the current timestamp
+import base64
+from django.core.files.base import ContentFile
+
+class CustomDetection():
+
+    
+    def detect_waste(self, file_obj):
+        """Process image and detect waste using YOLO."""
+        pil_image = Image.open(file_obj).convert('RGB')
+        img = np.array(pil_image)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+        # Run YOLO model
+        results = model.predict(img, imgsz=640)
+        detections = []
+        for result in results[0].boxes:
+            box = result.xyxy.numpy()[0]
+            cls = result.cls.numpy().item()
+            class_name = CLASS_NAMES.get(int(cls), "Unknown")
+            confidence = result.conf.numpy().item()
+
+            # Append detection info
+            detections.append({
+                "xmin": int(box[0]),
+                "ymin": int(box[1]),
+                "xmax": int(box[2]),
+                "ymax": int(box[3]),
+                "class_name": class_name,
+                "confidence": confidence
+            })
+
+            # Draw bounding box and label on the image
+            x_min, y_min, x_max, y_max = map(int, box)
+            cv2.rectangle(img, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+            cv2.putText(
+                img,
+                f"{class_name} {confidence:.2f}",
+                (x_min, y_min - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                2
+            )
+
+        return detections, img
+
+    def upload_to_cloudinary(self, processed_image):
+        """Upload the processed image to Cloudinary."""
+        _, buffer = cv2.imencode('.jpg', processed_image)
+        img_bytes = buffer.tobytes()
+
+        # Upload to Cloudinary
+        upload_result = cloudinary.uploader.upload(
+            img_bytes,
+            folder="waste_images"
+        )
+        return upload_result.get("secure_url")
+
+    def notify_staff(self, notification):
+        """Notify cleaning staff or escalate."""
+        print(f"Notification: {notification.message}")
+        # Send email/SMS/push notification logic here
 
 
+       
 class NotificationViewSet(viewsets.ModelViewSet):
-    permission_classes=[IsAuthenticated]
-    # queryset = Notification.objects.all()
+    # parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]
     serializer_class = NotificationSerializer
-
-    # @action(detail=False,methods=['POST'],permission_classes=[IsAuthenticated& IsSubDivisionalOffice])
-    def create(self, request, *args, **kwargs):
-        '''
+    '''
         +endpoint notify/notifications/
 
         {
@@ -29,43 +102,53 @@ class NotificationViewSet(viewsets.ModelViewSet):
         }
         
         '''
+    def create(self, request, *args, **kwargs):
         user = request.user
         try:
-            if not user.is_sub_divisional :
+            if not user.is_sub_divisional:
                 return Response({"error": "Unauthorized User or Divisional office cannot create."}, status=status.HTTP_403_FORBIDDEN)
-        
-            # Get the current user's associated division pincode from DivisionalOffice
-            print(user.is_sub_divisional)
-            current_user_division = SubDivisionalOffice.objects.get(user=user).pincode
 
-            #get post office
-            post_office=PostOffice.objects.get(pincode=current_user_division).pincode
+            # Extract the image from the request
+            image_data = request.data.get('image')
 
-            # Add the division_pincode to the request data
-            request.data['pincode'] = post_office
-
-            # Serialize the data
-            """Generate a new notification."""
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            
-            if serializer.is_valid():  # Check if the data is valid
-                notification = serializer.save()  # Save the new Event to the database
-                 # Notify cleaning staff
-                cleaning_staff = CleaningStaff.objects.filter(pincode=notification.pincode)
-                if cleaning_staff.exists():
-                    # Logic to send message to cleaning staff (e.g., SMS/Email API integration)
-                    print(f"Notification sent to cleaning staff: {cleaning_staff.values_list('name', flat=True)}")
-                    print(f"cleaning staff PHONE: {cleaning_staff}")
-
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-
+            if isinstance(image_data, str) and image_data.startswith('data:image'):
+                # Decode base64 image
+                format, imgstr = image_data.split(';base64,')  # format == 'data:image/png'
+                ext = format.split('/')[-1]  # Extract extension
+                image_file = ContentFile(base64.b64decode(imgstr), name=f"upload.{ext}")
             else:
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  # Return errors if the data is invalid
-        except DivisionalOffice.DoesNotExist:
-            return Response({"error": "User is not associated with a divisional office."}, status=status.HTTP_403_FORBIDDEN)
-        
-       
+                # Fallback to regular file upload
+                image_file = request.FILES.get('image')
+
+            if not image_file:
+                return Response({"error": "No image provided or invalid format."}, status=status.HTTP_400_BAD_REQUEST)
+
+            model = CustomDetection()
+
+            # Get the current user's associated division pincode
+            current_user_division = SubDivisionalOffice.objects.get(user=user).pincode
+            post_office = PostOffice.objects.get(pincode=current_user_division)
+
+            # Detect waste and process image
+            detections, processed_image = model.detect_waste(image_file)
+            if len(detections) > 1:  # Threshold for significant waste
+                cloudinary_url = model.upload_to_cloudinary(processed_image)
+                notification = Notification.objects.create(
+                    image=cloudinary_url,
+                    message=f"Significant waste detected at pincode {post_office.pincode}. Immediate action required!",
+                    level="SUBDIVISIONAL",
+                    pincode=post_office,
+                )
+
+                # Serialize the notification
+                serializer = self.get_serializer(notification)
+                return Response({"data": serializer.data, "detections": detections}, status=status.HTTP_201_CREATED)
+
+            return Response("Not created, No waste detected!", status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
        
     # def escalate_unresolved(self):
     #     """Automatically escalate unresolved notifications to divisional office."""
@@ -92,18 +175,36 @@ class NotificationViewSet(viewsets.ModelViewSet):
             if hasattr(user, 'is_sub_divisional') and user.is_sub_divisional:
                 # Fetch notifications for the subdivisional office based on user's pincode
                 user_pincode = SubDivisionalOffice.objects.get(user=user).pincode
-                return Notification.objects.filter(pincode=user_pincode,level="SUBDIVISIONAL")
+                post_office = PostOffice.objects.get(pincode=user_pincode)
+                notifications=Notification.objects.filter(pincode=user_pincode,level="SUBDIVISIONAL")
+                # notification_details = []
+                # for notification in notifications:
+                #     try: 
+                #         notification_details.append({
+                #             "notification": notification,
+                #             "post_office_name": post_office.name,
+                #             "post_office_address": post_office.address,
+                #             "post_office_division": post_office.division_pincode,  # ForeignKey to another PostOffice
+                #         })
+                #     except PostOffice.DoesNotExist:
+                #         # Handle cases where the PostOffice is missing
+                #         pass
+                return notifications
             
             elif hasattr(user, 'is_divisional') and user.is_divisional:
                 # Fetch notifications for all post offices under the divisional office
                 division_pincode = DivisionalOffice.objects.get(user=user).pincode
                 post_offices = PostOffice.objects.filter(division_pincode=division_pincode)
-                return Notification.objects.filter(pincode__in=post_offices, level="DIVISIONAL")
-            
+                notifications=Notification.objects.filter(pincode__in=post_offices, level="DIVISIONAL")
+               
+
+                return notifications
             return Notification.objects.none()  # No notifications for unauthorized users
         except PostOffice.DoesNotExist:
             return Response({"error": "User is not associated with a divisional office."}, status=status.HTTP_403_FORBIDDEN)
         
+    
+
 
     # @action(detail=False,methods=['PUT',"PATCH"],permission_classes=[IsAuthenticated])
     def update(self, request, *args, **kwargs):
@@ -153,7 +254,6 @@ class NotificationViewSet(viewsets.ModelViewSet):
             if 'response' in request.data:
                 instance.response = request.data['response']
                 instance.updatedAt = now()
-                instance.is_resolved = False
                 instance.read = True
                 instance.save()
                 return Response({"message": "Response added successfully."}, status=status.HTTP_200_OK)
@@ -169,3 +269,24 @@ class NotificationViewSet(viewsets.ModelViewSet):
     # def partial_update(self, request, *args, **kwargs):
     #     """Partial update alias for PATCH."""
     #     return self.update(request, *args, **kwargs)
+
+
+# Load the custom YOLOv8 model
+model = YOLO('C:/Users/atole/Documents/Projects/SIH/SIH_Shuddhi/backend/notifications/best.pt')
+
+# Class names for detection
+CLASS_NAMES = {
+    0: 'cardboard', 
+    1: 'dustbin', 
+    2: 'paper', 
+    3: 'paper-bottle-teacups-wrapper', 
+    4: 'plastic_bag', 
+    5: 'plastic_bottle', 
+    6: 'plastic_cap', 
+    7: 'plastic_food_container', 
+    8: 'plastic_wrapper', 
+    9: 'spit', 
+    10: 'tea_cup', 
+    11: 'tea_cup_cap', 
+    12: 'wooden_stick'
+}

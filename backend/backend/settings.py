@@ -12,10 +12,27 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+# Cloudinary settings (use environment variables for security)
+CLOUDINARY_CLOUD_NAME = "dlssri5bo"  # Replace with your Cloudinary cloud name
+CLOUDINARY_API_KEY = "744793723712238"  # Replace with your API key
+CLOUDINARY_API_SECRET = "wMPFiU-bWRbGMZhnfvbpXUDAqgE"  # Replace with your API secret
+
+# Configure Cloudinary
+cloudinary.config(
+    cloud_name=CLOUDINARY_CLOUD_NAME,
+    api_key=CLOUDINARY_API_KEY,
+    api_secret=CLOUDINARY_API_SECRET,
+    secure=True
+)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
@@ -26,7 +43,10 @@ SECRET_KEY = "django-insecure-7^cfhl%&(*g4gstkd%gm@+mmqos4ti7v3233d0(i!1!#=33jsc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    
+]
+
 
 
 # Application definition
@@ -136,6 +156,9 @@ REST_FRAMEWORK = {
 AUTH_USER_MODEL="users.User"
 ACCOUNT_UNIQUE_EMAIL=True
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
@@ -156,6 +179,7 @@ STATIC_URL = "static/"
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
 
 
 

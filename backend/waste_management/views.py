@@ -18,7 +18,7 @@ from rest_framework.exceptions import PermissionDenied
 from users.models import DivisionalOffice,SubDivisionalOffice
 from users.api.serializers import DivisionalOfficeSerializer,SubDivisionalOfficeSerializer
 
-class EventViewSet(viewsets.GenericViewSet):
+class EventViewSet(viewsets.ModelViewSet):
     """
     Custom ViewSet for Event:
     - Create/Update: Divisional Officers only.
@@ -27,19 +27,22 @@ class EventViewSet(viewsets.GenericViewSet):
 
     permission_classes=[IsAuthenticated]
     serializer_class=EventSerializer
-    queryset=Event.objects.all()
+    get_queryset=Event.objects.all()
 
     
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated& IsDivisionalOffice])
-    def create_event(self, request, *args, **kwargs):
+    # @action(detail=False, methods=['post'],url_path='create-event', permission_classes=[IsAuthenticated& IsDivisionalOffice])
+    def create(self, request, *args, **kwargs):
         """
         Handle POST request: Create a new PostOffice with the division_pincode set to the user's associated pincode.
         """
         user = request.user
         try:
             # Get the current user's associated division pincode from DivisionalOffice
-            current_user_division = DivisionalOffice.objects.get(user_id=user.id).pincode
+            if not user.is_divisional:
+                return Response({"error": "You are not authorized to add a report to this event."}, status=status.HTTP_403_FORBIDDEN)
 
+            current_user_division = DivisionalOffice.objects.get(user_id=user.id).pincode
+           
             #get post office
             post_office=PostOffice.objects.get(pincode=current_user_division).pincode
 
@@ -60,8 +63,8 @@ class EventViewSet(viewsets.GenericViewSet):
        
 
 
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
-    def get_event(self, request):
+    @action(detail=False, methods=['get'], url_path='get-events', permission_classes=[IsAuthenticated])
+    def get(self,request):
         """
         Custom action to filter PostOffices by division.
         """
@@ -76,7 +79,7 @@ class EventViewSet(viewsets.GenericViewSet):
             elif current_user.is_sub_divisional:
                 current_user_division = SubDivisionalOffice.objects.get(user=current_user).division_pincode
             
-            events=self.queryset.filter(pincode=current_user_division)
+            events=Event.objects.filter(pincode=current_user_division)
             serializer = EventSerializer(events, many=True)
             if len(serializer.data) ==0:
                 return Response({"message": "No events found"}, status=403)
@@ -150,7 +153,7 @@ class EventViewSet(viewsets.GenericViewSet):
 
 
 
-class EventReportViewSet(viewsets.GenericViewSet):
+class EventReportViewSet(viewsets.ModelViewSet):
     """
     Custom ViewSet for EventReport:
     - Create: Subdivision users only.
@@ -164,7 +167,7 @@ class EventReportViewSet(viewsets.GenericViewSet):
     '''*************** Post Report Method ***************'''
 
 
-    @action(detail=False, methods=['post'],url_path="create-report", permission_classes=[IsAuthenticated& IsSubDivisionalOffice])
+    # @action(detail=False, methods=['post'],url_path="create-report", permission_classes=[IsAuthenticated& IsSubDivisionalOffice])
     def create(self, request, *args, **kwargs):
         """
         Handle POST request: Create a new EventReport and associate it with an Event.
@@ -173,7 +176,7 @@ class EventReportViewSet(viewsets.GenericViewSet):
             "event_id": 1,
             "report_description": "Report for community event",
             "name": "John Doe",
-            "atLocation": true,
+            "atLocation": "sangamner",
             "attached_report": "<binary file>",
             "date_time": "2024-12-01T10:30:00Z"
         }
@@ -181,8 +184,12 @@ class EventReportViewSet(viewsets.GenericViewSet):
 
         """
         try:
+            user=request.user
+            if not user.is_sub_divisional:
+                return Response({"error": "You are not authorized to add a report to this event."}, status=status.HTTP_403_FORBIDDEN)
+
             # Get the SubDivisionalOffice user's associated division pincode
-            current_user_division = SubDivisionalOffice.objects.get(user=request.user).division_pincode
+            current_user_division = SubDivisionalOffice.objects.get(user=user).division_pincode
 
             # Extract the event ID from the request data
             event_id = request.data.get('event_id')
@@ -196,7 +203,7 @@ class EventReportViewSet(viewsets.GenericViewSet):
                 return Response({"error": "Event not found."}, status=status.HTTP_404_NOT_FOUND)
 
             # Check if the Event's pincode matches the user's division
-            if event.pincode != current_user_division:
+            if str(event.pincode) != str(current_user_division):
                 return Response({"error": "You are not authorized to add a report to this event."}, status=status.HTTP_403_FORBIDDEN)
 
             # Add the event and pincode to the request data
@@ -272,7 +279,7 @@ class EventReportViewSet(viewsets.GenericViewSet):
 
     '''*************** Delete Report Method ***************'''
 
-    @action(detail=True, methods=['delete'], url_path="delete-report", permission_classes=[IsAuthenticated & IsSubDivisionalOffice])
+    # @action(detail=True, methods=['delete'], url_path="delete-report", permission_classes=[IsAuthenticated & IsSubDivisionalOffice])
     def delete(self, request, pk=None, *args, **kwargs):
         """
         Handle DELETE request: Allow only the uploader (sub-divisional user) to delete the report.
@@ -306,7 +313,7 @@ class EventReportViewSet(viewsets.GenericViewSet):
 
     '''*************** Update Report Method ***************'''
 
-    @action(detail=True, methods=['put', 'patch'], url_path="update-report", permission_classes=[IsAuthenticated & IsSubDivisionalOffice])
+    # @action(detail=True, methods=['put', 'patch'], url_path="update-report", permission_classes=[IsAuthenticated & IsSubDivisionalOffice])
     def update(self, request, pk=None, *args, **kwargs):
         """
         Handle PUT/PATCH request: Allow only the uploader (sub-divisional user) to update the report
@@ -627,7 +634,7 @@ class SelledPaperWasteViewSet(viewsets.ModelViewSet):
 class CleaningStaffViewSet(viewsets.ModelViewSet):
     queryset = CleaningStaff.objects.all()
     serializer_class = CleaningStaffSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated & IsSubDivisionalOffice]
 
     def perform_create(self, serializer):
         # Ensure that only sub-divisional officers can create cleaning staff
@@ -635,8 +642,11 @@ class CleaningStaffViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Only sub-divisional officers can add cleaning staff.")
         
         # Proceed with the creation if the user is a sub-divisional officer
+        currentSubDivision=SubDivisionalOffice.objects.get(user=self.request.user)
+        postoffice=PostOffice.objects.get(pincode=currentSubDivision.pincode).pincode
+        serializer.pincode=postoffice
         user=serializer.save()
-        return Response({"user":user,"message":"Succesfully Deleted!"},status=status.HTTP_201_CREATED)
+        return Response({"user":user,"message":"Succesfully creadted!"},status=status.HTTP_201_CREATED)
 
     def perform_destroy(self, instance):
         # Ensure that only sub-divisional officers can delete cleaning staff
@@ -650,4 +660,9 @@ class CleaningStaffViewSet(viewsets.ModelViewSet):
     # You can optionally allow all users to perform the read operations (list and retrieve)
     def get_queryset(self):
         # You can customize this to filter based on the sub-divisional office if needed
-        return CleaningStaff.objects.all()
+        
+        if not IsSubDivisionalOffice or not self.request.user.is_sub_divisional:
+            raise PermissionDenied("Only sub-divisional officers can access cleaning staff.")
+        currentSubDivision=SubDivisionalOffice.objects.get(user=self.request.user)
+        cleaningStaff=CleaningStaff.objects.filter(pincode=currentSubDivision.pincode)
+        return cleaningStaff
