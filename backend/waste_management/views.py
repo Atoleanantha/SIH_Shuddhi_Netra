@@ -11,6 +11,9 @@ from users.api.permissions import IsDivisionalOffice,IsSubDivisionalOffice
 from django.db.models import Sum
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
+# from backend.cloudinary import upload_to_cloudinary
+import cloudinary.uploader
+
 # Create your views here.
 
 '''******************************* Event  Managemnt  *****************************************'''
@@ -37,6 +40,10 @@ class EventViewSet(viewsets.ModelViewSet):
         """
         user = request.user
         try:
+            file = request.data.get('attachment')
+            if not file:
+                return Response({"error": "No file found."}, status=status.HTTP_400_BAD_REQUEST)
+
             # Get the current user's associated division pincode from DivisionalOffice
             if not user.is_divisional:
                 return Response({"error": "You are not authorized to add a report to this event."}, status=status.HTTP_403_FORBIDDEN)
@@ -46,17 +53,29 @@ class EventViewSet(viewsets.ModelViewSet):
             #get post office
             post_office=PostOffice.objects.get(pincode=current_user_division).pincode
 
-
+           
             # Add the division_pincode to the request data
             request.data['pincode'] = post_office
+            try:
+                # Upload to Cloudinary
+                upload_result = cloudinary.uploader.upload(
+                    file,
+                    folder="events_gr"
+                )
+              
+                # attachment_url=upload_to_cloudinary(file,"events_gr")
+                request.data['attachment']=  upload_result.get("secure_url")
 
-            # Serialize the data
-            serializer = EventSerializer(data=request.data)
-            if serializer.is_valid():  # Check if the data is valid
-                serializer.save()  # Save the new Event to the database
-                return Response({"data":serializer.data,"message":current_user_division}, status=status.HTTP_201_CREATED)  # Return the created Event data with a 201 CREATED status
-            else:
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  # Return errors if the data is invalid
+                # Serialize the data
+                serializer = EventSerializer(data=request.data)
+                if serializer.is_valid():  # Check if the data is valid
+                    serializer.save()  # Save the new Event to the database
+                    return Response({"data":serializer.data,"message":current_user_division}, status=status.HTTP_201_CREATED)  # Return the created Event data with a 201 CREATED status
+                else:
+                    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  # Return errors if the data is invalid
+            except Exception as e:
+                print(f"Error uploading image: {e}")
+                return Response({"error":"Error uploading image"}, status=status.HTTP_403_FORBIDDEN)
         except DivisionalOffice.DoesNotExist:
             return Response({"error": "User is not associated with a divisional office."}, status=status.HTTP_403_FORBIDDEN)
         

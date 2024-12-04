@@ -8,13 +8,14 @@ class CleaningStaff(models.Model):
     name = models.CharField(max_length=255)
     contactNo = models.CharField(max_length=15)
     pincode = models.ForeignKey(PostOffice, on_delete=models.CASCADE)
-
+                    
 class Event(models.Model):
     id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=255)
     pincode = models.ForeignKey(PostOffice, on_delete=models.SET_NULL,null=True)
     description = models.TextField()
-    attachment = models.FileField(upload_to='attachments/')
+    
+    attachment = models.FileField()
     date_time = models.DateTimeField()
 
 class EventReport(models.Model):

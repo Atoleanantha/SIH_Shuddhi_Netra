@@ -1,10 +1,14 @@
 import cloudinary.uploader
 
 # Upload the image
-def upload_to_cloudinary(image_file):
+def upload_to_cloudinary(file,folder):
     try:
-        response = cloudinary.uploader.upload(image_file)
-        return response['secure_url']  # URL of the uploaded image
+        # Upload to Cloudinary
+        upload_result = cloudinary.uploader.upload(
+            file,
+            folder=folder
+        )
+        return upload_result.get("secure_url")
     except Exception as e:
         print(f"Error uploading image: {e}")
         return None

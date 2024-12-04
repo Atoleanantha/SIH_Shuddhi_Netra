@@ -27,6 +27,28 @@ from datetime import datetime  # Import datetime to get the current timestamp
 import base64
 from django.core.files.base import ContentFile
 
+
+# Load the custom YOLOv8 model
+model = YOLO('C:/Users/atole/Documents/Projects/SIH/SIH_Shuddhi/backend/notifications/best.pt')
+
+# Class names for detection
+CLASS_NAMES = {
+    0: 'cardboard', 
+    1: 'dustbin', 
+    2: 'paper', 
+    3: 'paper-bottle-teacups-wrapper', 
+    4: 'plastic_bag', 
+    5: 'plastic_bottle', 
+    6: 'plastic_cap', 
+    7: 'plastic_food_container', 
+    8: 'plastic_wrapper', 
+    9: 'spit', 
+    10: 'tea_cup', 
+    11: 'tea_cup_cap', 
+    12: 'wooden_stick'
+}
+
+
 class CustomDetection():
 
     
@@ -139,6 +161,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
                     level="SUBDIVISIONAL",
                     pincode=post_office,
                 )
+                model.notify_staff(notification=notification)
 
                 # Serialize the notification
                 serializer = self.get_serializer(notification)
@@ -270,23 +293,3 @@ class NotificationViewSet(viewsets.ModelViewSet):
     #     """Partial update alias for PATCH."""
     #     return self.update(request, *args, **kwargs)
 
-
-# Load the custom YOLOv8 model
-model = YOLO('C:/Users/atole/Documents/Projects/SIH/SIH_Shuddhi/backend/notifications/best.pt')
-
-# Class names for detection
-CLASS_NAMES = {
-    0: 'cardboard', 
-    1: 'dustbin', 
-    2: 'paper', 
-    3: 'paper-bottle-teacups-wrapper', 
-    4: 'plastic_bag', 
-    5: 'plastic_bottle', 
-    6: 'plastic_cap', 
-    7: 'plastic_food_container', 
-    8: 'plastic_wrapper', 
-    9: 'spit', 
-    10: 'tea_cup', 
-    11: 'tea_cup_cap', 
-    12: 'wooden_stick'
-}
