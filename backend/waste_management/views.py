@@ -41,6 +41,7 @@ class EventViewSet(viewsets.ModelViewSet):
         user = request.user
         try:
             file = request.data.get('attachment')
+         
             if not file:
                 return Response({"error": "No file found."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -60,7 +61,8 @@ class EventViewSet(viewsets.ModelViewSet):
                 # Upload to Cloudinary
                 upload_result = cloudinary.uploader.upload(
                     file,
-                    folder="events_gr"
+                    folder="events_gr",
+                   
                 )
               
                 # attachment_url=upload_to_cloudinary(file,"events_gr")
@@ -204,6 +206,7 @@ class EventReportViewSet(viewsets.ModelViewSet):
         """
         try:
             user=request.user
+            file=request.data.get("attached_report")
             if not user.is_sub_divisional:
                 return Response({"error": "You are not authorized to add a report to this event."}, status=status.HTTP_403_FORBIDDEN)
 
@@ -228,7 +231,12 @@ class EventReportViewSet(viewsets.ModelViewSet):
             # Add the event and pincode to the request data
             request.data['event'] = event.id
             request.data['pincode'] = current_user_division
-
+            upload_result = cloudinary.uploader.upload(
+                    file,
+                    folder="events_report",
+                   
+            )
+            request.data['attached_report'] =upload_result.get("secure_url")
             # Serialize and validate the data
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid():

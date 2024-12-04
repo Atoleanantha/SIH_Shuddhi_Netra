@@ -15,7 +15,8 @@ class Event(models.Model):
     pincode = models.ForeignKey(PostOffice, on_delete=models.SET_NULL,null=True)
     description = models.TextField()
     
-    attachment = models.FileField()
+    attachment =  models.TextField()
+    # attachment = models.FileField()
     date_time = models.DateTimeField()
 
 class EventReport(models.Model):
@@ -26,7 +27,8 @@ class EventReport(models.Model):
     report_description = models.TextField()
     name = models.CharField(max_length=255)
     atLocation = models.CharField(max_length=255)
-    attached_report = models.FileField(upload_to='reports/')
+    # attached_report = models.FileField(upload_to='reports/')
+    attached_report = models.TextField()
     date_time = models.DateTimeField()
 
 class Ewaste(models.Model):
