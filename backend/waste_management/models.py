@@ -6,6 +6,7 @@ from datetime import date
 class CleaningStaff(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
+    email=models.EmailField(max_length=255,null=True)
     contactNo = models.CharField(max_length=15)
     pincode = models.ForeignKey(PostOffice, on_delete=models.CASCADE)
                     

@@ -13,7 +13,7 @@ from django.core.files.storage import default_storage
 from rest_framework.parsers import MultiPartParser, FormParser
 import os
 from django.conf import settings
-
+import smtplib
 import cloudinary
 import cloudinary.uploader
 from rest_framework.response import Response
@@ -26,6 +26,12 @@ from django.conf import settings
 from datetime import datetime  # Import datetime to get the current timestamp
 import base64
 from django.core.files.base import ContentFile
+from rest_framework.response import Response
+from rest_framework import status
+from twilio.rest import Client
+import os
+from rest_framework.exceptions import PermissionDenied
+from django.conf import settings
 
 
 # Load the custom YOLOv8 model
@@ -104,10 +110,50 @@ class CustomDetection():
         )
         return upload_result.get("secure_url")
 
-    def notify_staff(self, notification):
+    def notify_staff(self, notification,cleaningStaff):
         """Notify cleaning staff or escalate."""
-        print(f"Notification: {notification.message}")
+        # Email credentials (static)
+        SENDER_EMAIL = "shuddhinetra@gmail.com"  # Replace with your sender email
+        EMAIL_PASSWORD = "qlth etnw odpb atjm"  # Replace with your app password
+        
+        ACCOUNT_SID = "AC951a2882f0de6fa160204263a1f084da"
+        AUTH_TOKEN = "4f4089ad57ccfa0f8dddff583889a123"
+        TWILIO_PHONE_NUMBER = "+17755045196"  # Replace with your Twilio phone number
+
+
+
+
         # Send email/SMS/push notification logic here
+        print("notification",cleaningStaff.email)
+        to_number = "+91"+cleaningStaff.contactNo
+        to_email = cleaningStaff.email
+        message = notification.message
+        subject = "Post Office cleaning Alert!"
+        
+        
+        if not to_number or not message:
+            return Response({"error": "Both 'to_number' and 'message' are required."}, status=status.HTTP_400_BAD_REQUEST)
+         # Prepare the email content
+        text = f"Subject: {subject}\n\n{message}\n\n Imgae Link :- {notification.image}"
+        
+        client = Client(ACCOUNT_SID, AUTH_TOKEN)
+
+        try:
+            # Send email using smtplib
+            with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                server.starttls()
+                server.login(SENDER_EMAIL, EMAIL_PASSWORD)
+                server.sendmail(SENDER_EMAIL, to_email, text)
+
+            msg = client.messages.create(
+                body=text,
+                from_=TWILIO_PHONE_NUMBER,
+                to=to_number
+            )
+            print(f"SMS And Email sent successfully! Message SID: {msg.sid} . {to_email}")
+        
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
        
@@ -150,6 +196,9 @@ class NotificationViewSet(viewsets.ModelViewSet):
             # Get the current user's associated division pincode
             current_user_division = SubDivisionalOffice.objects.get(user=user).pincode
             post_office = PostOffice.objects.get(pincode=current_user_division)
+            cleaningStaff = CleaningStaff.objects.get(pincode=post_office)
+            print(cleaningStaff.email)
+            print(cleaningStaff.contactNo)
 
             # Detect waste and process image
             detections, processed_image = model.detect_waste(image_file)
@@ -161,11 +210,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
                     level="SUBDIVISIONAL",
                     pincode=post_office,
                 )
-                model.notify_staff(notification=notification)
+                model.notify_staff(notification=notification,cleaningStaff=cleaningStaff)
 
                 # Serialize the notification
                 serializer = self.get_serializer(notification)
-                return Response({"data": serializer.data, "detections": detections}, status=status.HTTP_201_CREATED)
+                return Response({"data": serializer.data ,"detections": detections}, status=status.HTTP_201_CREATED)
 
             return Response("Not created, No waste detected!", status=status.HTTP_400_BAD_REQUEST)
 
@@ -292,4 +341,12 @@ class NotificationViewSet(viewsets.ModelViewSet):
     # def partial_update(self, request, *args, **kwargs):
     #     """Partial update alias for PATCH."""
     #     return self.update(request, *args, **kwargs)
+    def perform_destroy(self, instance):
+        # Ensure that only sub-divisional officers can delete cleaning staff
+        if not self.request.user.is_sub_divisional:
+            raise PermissionDenied("Only sub-divisional officers can delete cleaning staff.")
+        
+        # Proceed with deletion if the user is a sub-divisional officer
+        instance.delete()
+        return Response({"message:":"Succesfully Deleted!"},status=status.HTTP_202_ACCEPTED)
 

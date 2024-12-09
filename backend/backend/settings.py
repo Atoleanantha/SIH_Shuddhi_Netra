@@ -15,6 +15,10 @@ from datetime import timedelta
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+from decouple import config
+
+import firebase_admin
+
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -43,9 +47,8 @@ SECRET_KEY = "django-insecure-7^cfhl%&(*g4gstkd%gm@+mmqos4ti7v3233d0(i!1!#=33jsc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    
-]
+ALLOWED_HOSTS = []
+
 
 
 
@@ -199,3 +202,4 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+

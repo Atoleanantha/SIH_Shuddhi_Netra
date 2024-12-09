@@ -40,6 +40,7 @@ class DivisionalOfficeSignUpSerializer(serializers.ModelSerializer):
             password=validated_data['password'],
             email=validated_data['email'],
             is_divisional=True,
+            is_sub_divisional=False,
         )
         DivisionalOffice.objects.create(
             user=user,
@@ -88,6 +89,7 @@ class SubDivisionalOfficeSignUpSerializer(serializers.ModelSerializer):
             password=validated_data['password'],
             email=validated_data['email'],
             is_sub_divisional=True,
+            is_divisional=False,
         )
         SubDivisionalOffice.objects.create(
             user=user,
