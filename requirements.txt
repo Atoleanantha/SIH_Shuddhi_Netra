@@ -10,3 +10,10 @@ django-cors-headers
 psycopg2
 twilio
 smtp
+channels
+channels-redis
+python-decouple
+ultralytics
+channels 
+channels-redis  
+daphne

@@ -15,9 +15,9 @@ from datetime import timedelta
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
-from decouple import config
+# from decouple import config
 
-import firebase_admin
+# import firebase_admin
 
 
 
@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "daphne",
     "users",
     "post_office",
     "waste_management",
@@ -69,6 +70,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     'corsheaders',
     'django_celery_beat', 
+  
 ]
 
 
@@ -116,6 +118,8 @@ TEMPLATES = [
     },
 ]
 
+ASGI_APPLICATION = 'backend.asgi.application'
+
 WSGI_APPLICATION = "backend.wsgi.application"
 
 
@@ -137,6 +141,12 @@ DATABASES = {
         'PASSWORD': 'root',
         'HOST': 'localhost',  # Or your PostgreSQL server address
         'PORT': '5432',       # Default PostgreSQL port
+    }
+}
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': "channels.layers.InMemoryChannelLayer"
     }
 }
 

@@ -3,6 +3,8 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from django.utils.timezone import now
 from django.db.models import Q
+
+from .consumers import NotificationConsumer
 from .models import Notification
 from waste_management.models import CleaningStaff
 from .serializers import NotificationSerializer
@@ -32,6 +34,12 @@ from twilio.rest import Client
 import os
 from rest_framework.exceptions import PermissionDenied
 from django.conf import settings
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
 
 
 # Load the custom YOLOv8 model
@@ -211,7 +219,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
                     pincode=post_office,
                 )
                 model.notify_staff(notification=notification,cleaningStaff=cleaningStaff)
-
+                NotificationConsumer.send_notification("Send notification")
                 # Serialize the notification
                 serializer = self.get_serializer(notification)
                 return Response({"data": serializer.data ,"detections": detections}, status=status.HTTP_201_CREATED)
