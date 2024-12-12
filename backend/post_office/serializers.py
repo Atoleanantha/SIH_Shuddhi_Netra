@@ -5,5 +5,4 @@ class PostOfficeSerializer(serializers.ModelSerializer):
     class Meta:
         model=PostOffice
         fields="__all__"
-    
-        
+

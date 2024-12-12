@@ -7,9 +7,9 @@ class Notification(models.Model):
         ('SUBDIVISIONAL', 'Subdivisional'),
         ('DIVISIONAL', 'Divisional'),
     )
-
     id = models.AutoField(primary_key=True)
     image = models.FileField()
+    location=models.CharField(max_length=255)
     message = models.CharField(max_length=255)
     action_performed = models.CharField(max_length=255, blank=True, null=True)
     response = models.CharField(max_length=255, blank=True, null=True)
@@ -26,3 +26,12 @@ class Notification(models.Model):
         self.level = 'DIVISIONAL'
         self.updatedAt = now()
         self.save()
+
+class Complaint(models.Model):
+    id = models.AutoField(primary_key=True)
+    pincode = models.ForeignKey(PostOffice, on_delete=models.CASCADE)
+    createdAt = models.DateTimeField(default=now)
+    image = models.FileField()
+    description=models.TextField()
+    location = models.TextField()
+    action =models.BooleanField(default=False)

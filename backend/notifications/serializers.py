@@ -1,7 +1,12 @@
 from rest_framework import serializers
-from .models import Notification
+from .models import Notification,Complaint
 from rest_framework import serializers
 from post_office.models import PostOffice
+
+class ComplaintSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Complaint
+        fields = ['id', 'pincode', 'createdAt', 'image', 'description', 'location', 'action']
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:

@@ -3,11 +3,10 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from django.utils.timezone import now
 from django.db.models import Q
-
 from .consumers import NotificationConsumer
 from .models import Notification
 from waste_management.models import CleaningStaff
-from .serializers import NotificationSerializer
+from .serializers import NotificationSerializer,ComplaintSerializer
 from rest_framework.permissions import IsAuthenticated
 from users.models import DivisionalOffice, SubDivisionalOffice
 from post_office.models import PostOffice
@@ -34,18 +33,28 @@ from twilio.rest import Client
 import os
 from rest_framework.exceptions import PermissionDenied
 from django.conf import settings
+from rest_framework.decorators import action
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-
+from .models import Complaint
 
 
 # Load the custom YOLOv8 model
 model = YOLO('C:/Users/atole/Documents/Projects/SIH/SIH_Shuddhi/backend/notifications/best.pt')
 
 # Class names for detection
+# CLASS_NAMES = {
+#     0: "Dustbin",
+#   1: "cardboard",
+#   2: "paper",
+#   3: "plastic",
+#   4: "plastic_bag",
+#   5: "plastic_bottle",
+#   6: "trash-overflow",
+# }
 CLASS_NAMES = {
     0: 'cardboard', 
     1: 'dustbin', 
@@ -135,8 +144,8 @@ class CustomDetection():
         print("notification",cleaningStaff.email)
         to_number = "+91"+cleaningStaff.contactNo
         to_email = cleaningStaff.email
-        message = notification.message
-        subject = "Post Office cleaning Alert!"
+        message = notification.message if notification.message else notification.description
+        subject = notification.message if "Post Office cleaning Alert!" else "Complaint! Post Office cleaning Alert!"
         
         
         if not to_number or not message:
@@ -164,7 +173,92 @@ class CustomDetection():
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-       
+class ComplaintViewSet(viewsets.ViewSet):
+    queryset = Complaint.objects.all()
+    serializer_class = ComplaintSerializer
+
+    def create(self, request, *args, **kwargs):
+        """
+        Override the create method to customize behavior when creating a new complaint.
+        """
+        try:
+            # model = CustomDetection()
+            # Extract the image from the request
+            image_data = request.data.get('image')
+            location = request.data.get('location')
+            print("location:", location)
+
+            if isinstance(image_data, str) and image_data.startswith('data:image'):
+                # Decode base64 image
+                format, imgstr = image_data.split(';base64,')  # format == 'data:image/png'
+                ext = format.split('/')[-1]  # Extract extension
+                image_file = ContentFile(base64.b64decode(imgstr), name=f"upload.{ext}")
+            else:
+                # Fallback to regular file upload
+                image_file = request.FILES.get('image')
+
+            if not image_file:
+                return Response({"error": "No image provided or invalid format."}, status=status.HTTP_400_BAD_REQUEST)
+
+            print("image:", image_file)
+            pincode = request.data.get('pincode')
+            post_office = PostOffice.objects.get(pincode=pincode)
+
+            if not post_office:
+                return Response({"error": "No post office for provided or invalid pincode."}, status=status.HTTP_400_BAD_REQUEST)
+
+            cleaningStaff = CleaningStaff.objects.get(pincode=post_office)
+            cloudinary_url = cloudinary.uploader.upload(
+            image_file,
+            folder="compalaint"
+        ).get("secure_url")
+            print(cloudinary_url)
+            
+            complaint = Complaint.objects.create(
+                image=cloudinary_url,
+                description=request.data.get('description'),
+                location=request.data.get('location'),
+                pincode=post_office
+            )
+            model.notify_staff(notification=complaint, cleaningStaff=cleaningStaff)
+
+            serializer = ComplaintSerializer(complaint)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+    @action(detail=False,permission_classes=[IsAuthenticated],methods=["Get"])
+    def get(self, request):
+        """Filter complaints based on the user's role and pincode."""
+        try:
+            user = self.request.user
+            print(user)
+            if hasattr(user, 'is_sub_divisional') and user.is_sub_divisional:
+                # Fetch complaints for the subdivisional office based on user's pincode
+                user_pincode = SubDivisionalOffice.objects.get(user=user).pincode
+                post_office = PostOffice.objects.get(pincode=user_pincode)
+                complaints = Complaint.objects.filter(pincode=post_office)
+                return Response(ComplaintSerializer(complaints, many=True).data)
+
+            return Response({"error": "Unauthorized access."}, status=status.HTTP_403_FORBIDDEN)
+        except PostOffice.DoesNotExist:
+            return Response({"error": "User is not associated with an office."}, status=status.HTTP_403_FORBIDDEN)
+
+    # @action(detail=True, methods=['patch'])
+    def update(self, request, pk=None):
+        """
+        Custom action to mark a complaint as actioned.
+        """
+        try:
+            complaint = Complaint.objects.get(pk=pk)
+            complaint.action = True
+            complaint.save()
+            return Response({'status': 'Complaint marked as actioned'}, status=status.HTTP_200_OK)
+        except Complaint.DoesNotExist:
+            return Response({"error": "Complaint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    
 class NotificationViewSet(viewsets.ModelViewSet):
     # parser_classes = [MultiPartParser, FormParser]
     permission_classes = [IsAuthenticated]
@@ -180,12 +274,16 @@ class NotificationViewSet(viewsets.ModelViewSet):
         '''
     def create(self, request, *args, **kwargs):
         user = request.user
+        
         try:
             if not user.is_sub_divisional:
                 return Response({"error": "Unauthorized User or Divisional office cannot create."}, status=status.HTTP_403_FORBIDDEN)
 
             # Extract the image from the request
             image_data = request.data.get('image')
+            location = request.data.get('location')
+            print("image:",image_data)
+            print("location:",location)
 
             if isinstance(image_data, str) and image_data.startswith('data:image'):
                 # Decode base64 image
@@ -209,6 +307,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
             print(cleaningStaff.contactNo)
 
             # Detect waste and process image
+            
             detections, processed_image = model.detect_waste(image_file)
             if len(detections) > 1:  # Threshold for significant waste
                 cloudinary_url = model.upload_to_cloudinary(processed_image)
@@ -219,7 +318,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
                     pincode=post_office,
                 )
                 model.notify_staff(notification=notification,cleaningStaff=cleaningStaff)
-                NotificationConsumer.send_notification("Send notification")
+                NotificationConsumer.send_notification(str(notification.message)+"\t"+str(notification.pincode.pincode)+"\n"+ str(notification.createdAt))
                 # Serialize the notification
                 serializer = self.get_serializer(notification)
                 return Response({"data": serializer.data ,"detections": detections}, status=status.HTTP_201_CREATED)

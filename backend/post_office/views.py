@@ -7,7 +7,11 @@ from .models import PostOffice
 from .serializers import PostOfficeSerializer
 from users.models import DivisionalOffice
 from users.api.permissions import IsDivisionalOffice
+from notifications.models import Notification
+
 import logging
+
+    
 
 class PostOfficeViewSet(APIView):
     """
@@ -125,3 +129,4 @@ class PostOfficeViewSet(APIView):
             return Response({"data":serializer.data,"message": "Success"})
         except DivisionalOffice.DoesNotExist:
             return Response({"error": "User is not associated with a divisional office."}, status=403)
+

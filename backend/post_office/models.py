@@ -6,6 +6,8 @@ class PostOffice(models.Model):
     contact_no = models.CharField(max_length=15)
     address = models.TextField()
     division_pincode = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
-
+    rating=models.CharField(default="0")
     def __str__(self):
         return self.pincode
+    
+
