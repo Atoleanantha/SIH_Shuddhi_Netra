@@ -220,6 +220,7 @@ class ComplaintViewSet(viewsets.ViewSet):
                 location=request.data.get('location'),
                 pincode=post_office
             )
+            post_office.calculate_rating()
             model.notify_staff(notification=complaint, cleaningStaff=cleaningStaff)
 
             serializer = ComplaintSerializer(complaint)
@@ -254,6 +255,8 @@ class ComplaintViewSet(viewsets.ViewSet):
             complaint = Complaint.objects.get(pk=pk)
             complaint.action = True
             complaint.save()
+            # Recalculate the post office rating
+            complaint.pincode.calculate_rating()
             return Response({'status': 'Complaint marked as actioned'}, status=status.HTTP_200_OK)
         except Complaint.DoesNotExist:
             return Response({"error": "Complaint not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -317,6 +320,9 @@ class NotificationViewSet(viewsets.ModelViewSet):
                     level="SUBDIVISIONAL",
                     pincode=post_office,
                 )
+                # Calculate and update the post office rating
+                post_office.calculate_rating()
+
                 model.notify_staff(notification=notification,cleaningStaff=cleaningStaff)
                 NotificationConsumer.send_notification(str(notification.message)+"\t"+str(notification.pincode.pincode)+"\n"+ str(notification.createdAt))
                 # Serialize the notification
@@ -410,6 +416,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
                 instance.read = True
                 instance.updatedAt = now()
                 instance.save()
+                instance.pincode.calculate_rating()
                 return Response({"message": "Action performed updated successfully."}, status=status.HTTP_200_OK)
 
             return Response(
